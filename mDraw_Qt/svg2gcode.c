@@ -30,11 +30,11 @@
  */
 
 #include "svg2gcode.h"
-//#ifdef _WIN32
-//typedef unsigned long int uint64_t;
-//typedef unsigned int  uint32_t;
 
 
+static SVGPoint bezPoints[64];
+static SVGPoint first,last;
+static int bezCount = 0;
 static float minf(float a, float b) { return a < b ? a : b; }
 static float maxf(float a, float b) { return a > b ? a : b; }
 static float bounds[4];
@@ -332,24 +332,6 @@ void reorder(SVGPoint* pts, int* cities, int ncity) {
         }
     }
 }
-
-void help() {
-    printf("usage: svg2gcode [options] svg-file gcode-file\n");
-    printf("options:\n");
-    printf("\t-S try to simplify hatching\n");
-    printf("\t-c use z-axis instead of laser\n");
-    printf("\t-f feed rate (8000.0)\n");
-    printf("\t-n # number of reorders (30)\n");
-    printf("\t-s scale (1.0)\n");
-    printf("\t-F flip Y-axis\n");
-    printf("\t-w final width in mm\n");
-    printf("\t-t Bezier tolerance (0.5)\n");
-    printf("\t-m machine accuracy (0.5)\n");
-    printf("\t-z z-traverse (1.0)\n");
-    printf("\t-Z z-engage (-1.0)\n");
-    printf("\t-B do Bezier curve smoothing\n");
-    printf("\t-h this help\n");
-}
 void  setPrintLaster(char *pons )
 {
     int i = strlen(pons);
@@ -360,86 +342,65 @@ void setPrintHead(char* phead)
     int i = strlen(phead);
     strncpy(pheader,phead,i);
 }
-void setPrintEnd( char *pend)
-{
 
-}
 int svgToGcode(char * file,int be) {
 
     int i,j,k,l,first;
     doBez = be;
-    //struct NSVGimage* image;
-    struct NSVGshape *shape1,*shape2;
-    struct NSVGpath *path1,*path2;
+
     SVGPoint* points;
     ToolPath* paths;
     int *cities,npaths;
+    int numReord = 30;
+    int flip = 0;
+    int skip = 0;
+    int printed=0;
+    int cncMode = 0;
     float feed = 3500.0;
     float ztraverse = 1.;
     float zengage = 1.;
     float width = -1;
-    float w,widthInmm = -1.;
-    int numReord = 30;
+    float w = -1.0;
+
     float scale = 0.01;
     float tol = 0.5;
-    float size = 100;
-    float accuracy = 0.5;
     float x,y,bx,by,bxold,byold,d,firstx,firsty;
     float xold,yold;
-    int flip = 0;
-    int skip = 0;
-    int units = 0;
-    int printed=0;
-    int cncMode = 0;
+
     FILE *gcode;
 
     char *input_file = file;
 
     simplify = 0;
-    //获取svg文件
+    //get svg file
     g_image = nsvgParseFromFile(input_file,"mm",0.1);
     if(g_image == NULL) {
         printf("error: Can't open input %s\n",input_file);
         return -1;
     }
-    //计算边界
     calcBounds(g_image);
-    //    width = g_image->width;
+    //  set width of the picture
     width = 100;
     w = fabs(bounds[0]-bounds[2]);
-    //   if(scale == 1.0 && widthInmm != -1.0)
-    //       scale = widthInmm/w;
     scale = width/w;
 #ifdef _WIN32
     seedrand((float)time(0));
 #endif
-    //创建gcode文件
     gcode=fopen("out.gcode","w");
     if(gcode == NULL)
     {
         return -1;
     }
     printf("paths %d points %d\n",pathCount, pointsCount);
-    // allocate memory
-    // 分配gcode的内存空间
     points = (SVGPoint*)malloc(pathCount*2*sizeof(SVGPoint));
     cities = (int*)malloc(pathCount*2*sizeof(int));
     paths = (ToolPath*)malloc(pointsCount*2*sizeof(ToolPath));
 
     npaths = 0;
-    //计算路径
     calcPaths(points,paths,cities,&npaths);
-    /*  if(doBez) {
-    Bez = fopen("bez.lst","w");
-    if(Bez == NULL) {
-      printf("bez file!\n");
-      return -1;
-    }
-    fprintf(Bez,"paths = %d\n",npaths);
-  }
-  */
+
     printf("reorder ");
-    //导出到文件中的准备工作
+    //export to the known file
     for(k=0;k<numReord;k++) {
         reorder(points,cities,pathCount);
         printf("%d... ",k);
@@ -448,12 +409,9 @@ int svgToGcode(char * file,int be) {
     printf("\n");
     fprintf(gcode,";bounds %f %f %f %f paths %d\n",(bounds[0]*scale),(bounds[1]*scale),(bounds[2]*scale),(bounds[3]*scale),npaths);
 
-    //打印首行
-    //    fprintf(gcode,GHEADER);
+    //print header
     fprintf(gcode,pheader);
 
-    if(cncMode) //cnc-mode can use z-axis
-        fprintf(gcode,GMODE);
     k=0;
     i=0;
     for(i=0;i<pathCount;i++) {
@@ -476,7 +434,6 @@ int svgToGcode(char * file,int be) {
 
         //    fprintf(gcode,"( a close path %d )\n",paths[k].city);
         if(!cncMode)
-            //            fprintf(gcode,CUTTERON);
             fprintf(gcode,pon);
         else
             fprintf(gcode,"G1 Z%.1f F%.1f\n",zengage,feed);
@@ -489,7 +446,7 @@ int svgToGcode(char * file,int be) {
             first = 1;
 
             if(paths[j].city == cities[i]) {
-                //画杯贝塞尔曲线
+                //bez
                 if(doBez)
                 {
                     bezCount = 0;
@@ -538,31 +495,17 @@ int svgToGcode(char * file,int be) {
                         fprintf(gcode,"G0 X%.1f Y%.1f Z%.1f\n",x,y,ztraverse);
                         x = (paths[j].points[2]-bounds[0])*scale;
                         y = (flip ? (bounds[3]-paths[j].points[3])*scale : (paths[j].points[3]-bounds[1])*scale);
-                        fprintf(gcode,CUTTERON);
-                        //fprintf(gcode,"G1 X%.1f Y%.1f Z%.1f F%.1f\n",x,y,zengage,feed);
+                        fprintf(gcode,pon);
                         xold = x;
                         yold = y;
                     }
                 }
                 paths[j].city = -1;
-                /*
-    if(printed == 0) {
-      if(doBez)
-        fprintf(gcode,"G1 X%.1f Y%.1f Z%.1f F%.1f\n",bx,by,zengage,feed);
-      else
-        fprintf(gcode,"G1 X%.1f Y%.1f Z%.1f F%.1f\n",x,y,zengage,feed);
-    }
-    */
             } else
                 break;
         }
         if(paths[j].closed && !simplify)
         {
-            //一个闭环的路径
-            // fprintf(gcode, "( end )\n");
-            //bx = (bezPoints[0].x-bounds[0])*scale;
-            //by = (flip ? (bounds[3]-bezPoints[0].y)*scale : (bezPoints[0].y-bounds[1])*scale);
-
             fprintf(gcode,"G1 X%.1f y%.1f Z%.1f F%.1f\n",firstx,firsty,zengage,feed);
         }
         if(!cncMode)

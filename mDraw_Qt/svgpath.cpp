@@ -29,10 +29,7 @@ void svgPath::setHeader(QString pheader)
 {
     setPrintHead(pheader.toLatin1().data());
 }
-void svgPath::setEnder(QString pender)
-{
-    setPrintEnd(pender.toLatin1().data());
-}
+
 
 //parse the gcode
 //store the gcode in the vector

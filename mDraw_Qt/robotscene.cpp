@@ -30,15 +30,19 @@ robotScene:: ~robotScene()
 {
 
 }
-void robotScene::mousePressEvent(QGraphicsSceneMouseEvent *event)
-{
-    //    QPointF pos = event->scenePos();
-    //    qDebug()<<tr("you pressed pos %1,%2").arg(pos.x()).arg(pos.y());
-}
-void robotScene::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
-{
+//void robotScene::mousePressEvent(QGraphicsSceneMouseEvent *event)
+//{
 
-}
+//}
+//void robotScene::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
+//{
+
+//}
+//void robotScene::mouseDoubleClickEvent(QGraphicsSceneMouseEvent *event)
+//{
+//    //    QPointF pos = event->scenePos();
+//    //    emit Sig_pos(pos);
+//}
 void robotScene::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
 {
     mouseLastPos = event->scenePos();
@@ -50,13 +54,11 @@ void robotScene::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
     event->accept();
     QGraphicsScene::mouseMoveEvent(event);
 }
-void robotScene::mouseDoubleClickEvent(QGraphicsSceneMouseEvent *event)
-{
-    //    QPointF pos = event->scenePos();
-    //    emit Sig_pos(pos);
-}
+
 void robotScene::drawBackground(QPainter *painter, const QRectF &rect)
 {
+    QRectF m = rect;
+    qDebug()<<m.height();
     if (painter->paintEngine()->type()!= QPaintEngine::OpenGL2)
     {
         qWarning("OpenGLScene: drawBackground needs a QGLWidget to be set as viewport on the graphics view");
